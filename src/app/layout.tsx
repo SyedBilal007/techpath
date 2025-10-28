@@ -8,6 +8,7 @@ import { GA } from "@/components/analytics/GA";
 import { CookieConsent } from "@/components/analytics/CookieConsent";
 import { AdSenseScript } from "@/components/ads";
 import { getSiteMetadata } from "@/lib/env";
+import { SpeedInsights } from '@vercel/speed-insights/next';
 
 // Lazy load Footer since it's below the fold
 const Footer = dynamic(() => import("@/components/Footer").then(mod => ({ default: mod.Footer })), {
@@ -81,6 +82,7 @@ export default function RootLayout({
           <div className="relative flex min-h-screen flex-col">
             <Navigation />
             <main className="flex-1">{children}</main>
+            <SpeedInsights />
             <Footer />
             <CookieConsent />
           </div>
