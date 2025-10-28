@@ -1,0 +1,15 @@
+# *
+User-agent: *
+Allow: /
+
+# *
+User-agent: *
+Disallow: /api/
+Disallow: /_next/
+Disallow: /static/
+
+# Host
+Host: https://techpath.dev
+
+# Sitemaps
+Sitemap: https://techpath.dev/sitemap.xml

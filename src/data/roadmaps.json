@@ -1,0 +1,67 @@
+[
+  {
+    "career": "Data Analyst",
+    "slug": "data-analyst",
+    "tagline": "Turn raw data into actionable insights.",
+    "steps": [
+      { "name": "Excel & Google Sheets", "desc": "Formulas, pivot tables, cleaning.", "resources": ["ExcelJet", "Google Sheets Guide"] },
+      { "name": "SQL Fundamentals", "desc": "SELECT, JOIN, GROUP BY.", "resources": ["SQLZoo", "Mode SQL Tutorial", "LeetCode SQL"] },
+      { "name": "Python for Data", "desc": "Pandas, NumPy, data wrangling.", "resources": ["Kaggle Python", "DataCamp Intro to Python"] },
+      { "name": "Visualization", "desc": "Power BI or Tableau dashboards.", "resources": ["Microsoft Learn Power BI", "Tableau Public Tutorials"] },
+      { "name": "Portfolio Projects", "desc": "Open datasets, dashboards, GitHub.", "resources": ["Kaggle Datasets", "GitHub Pages"] },
+      { "name": "Job Prep", "desc": "Resume, LinkedIn, mock interviews.", "resources": ["InterviewQuery", "LinkedIn Learning"] }
+    ]
+  },
+  {
+    "career": "Web Developer",
+    "slug": "web-developer",
+    "tagline": "Build the modern web from front to back.",
+    "steps": [
+      { "name": "HTML & CSS", "desc": "Layout, flexbox, responsive.", "resources": ["MDN Web Docs", "FreeCodeCamp HTML/CSS"] },
+      { "name": "JavaScript", "desc": "ES6, DOM, async/await.", "resources": ["JavaScript.info", "W3Schools JS"] },
+      { "name": "Frontend Framework", "desc": "React or Next.js basics.", "resources": ["React.dev", "Next.js Learn"] },
+      { "name": "Version Control", "desc": "Git/GitHub flow.", "resources": ["GitHub Guides", "Atlassian Git Tutorial"] },
+      { "name": "Backend Basics", "desc": "Node.js + Express APIs.", "resources": ["Node.js Docs", "Express Crash Course"] },
+      { "name": "Deploy & Portfolio", "desc": "Vercel/Netlify hosting.", "resources": ["Vercel Docs", "Netlify Docs"] }
+    ]
+  },
+  {
+    "career": "AI Engineer",
+    "slug": "ai-engineer",
+    "tagline": "Create intelligent systems with data and algorithms.",
+    "steps": [
+      { "name": "Python Programming", "desc": "Efficient scripts & tooling.", "resources": ["Automate the Boring Stuff", "Real Python"] },
+      { "name": "Math for ML", "desc": "Linear algebra, stats, calculus.", "resources": ["Khan Academy", "StatQuest"] },
+      { "name": "Machine Learning", "desc": "scikit-learn, key algorithms.", "resources": ["Andrew Ng ML", "Kaggle ML"] },
+      { "name": "Deep Learning", "desc": "TF or PyTorch, CNNs/RNNs.", "resources": ["fast.ai", "DeepLearning.ai"] },
+      { "name": "MLOps", "desc": "Deployment & monitoring.", "resources": ["AWS SageMaker", "MLflow Docs"] },
+      { "name": "Portfolio Projects", "desc": "Ship demos & apps.", "resources": ["Hugging Face", "GitHub Projects"] }
+    ]
+  },
+  {
+    "career": "Cybersecurity Analyst",
+    "slug": "cybersecurity-analyst",
+    "tagline": "Protect systems and data from threats.",
+    "steps": [
+      { "name": "Networking Basics", "desc": "TCP/IP, DNS, HTTP, firewalls.", "resources": ["Cisco Basics", "NetworkChuck YouTube"] },
+      { "name": "Security Fundamentals", "desc": "CIA triad, auth, crypto.", "resources": ["Cybrary", "CompTIA Security+"] },
+      { "name": "Tools & Monitoring", "desc": "Wireshark, Nmap, SIEM.", "resources": ["TryHackMe", "Splunk Fundamentals"] },
+      { "name": "Incident Response", "desc": "Detect, contain, recover.", "resources": ["IBM Cybersecurity Analyst"] },
+      { "name": "Compliance & Risk", "desc": "GDPR, ISO 27001, risk.", "resources": ["Coursera Governance"] },
+      { "name": "Certifications", "desc": "Security+, CEH, OSCP.", "resources": ["CompTIA", "OffSec"] }
+    ]
+  },
+  {
+    "career": "Cloud Architect",
+    "slug": "cloud-architect",
+    "tagline": "Design and scale infrastructure in the cloud.",
+    "steps": [
+      { "name": "Cloud Basics", "desc": "IaaS/PaaS/SaaS, regions, pricing.", "resources": ["AWS Cloud Practitioner", "Azure Fundamentals"] },
+      { "name": "Compute & Storage", "desc": "EC2, S3, Lambda / Azure VMs, Blob.", "resources": ["AWS Docs", "Azure Docs"] },
+      { "name": "Networking & Security", "desc": "VPC, IAM, policies.", "resources": ["AWS IAM", "Azure Network"] },
+      { "name": "Automation & IaC", "desc": "Terraform/CloudFormation.", "resources": ["Terraform.io", "AWS CFN"] },
+      { "name": "Architecture Design", "desc": "HA, LB, DR patterns.", "resources": ["AWS Well-Architected"] },
+      { "name": "Certifications", "desc": "AWS SA, Azure Architect.", "resources": ["AWS Training", "Microsoft Learn"] }
+    ]
+  }
+]
