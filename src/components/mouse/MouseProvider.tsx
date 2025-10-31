@@ -148,3 +148,15 @@ export function useMouse(): MouseContextValue {
   
   return context;
 }
+
+/**
+ * usePointer - Alias for useMouse with pointer object format
+ * Returns { pointer: { x, y }, enabled } for compatibility
+ */
+export function usePointer() {
+  const { x, y, enabled } = useMouse();
+  return {
+    pointer: { x, y },
+    enabled,
+  };
+}
