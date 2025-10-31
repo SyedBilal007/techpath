@@ -9,6 +9,7 @@ import { CookieConsent } from "@/components/analytics/CookieConsent";
 import { AdSenseScript } from "@/components/ads";
 import { getSiteMetadata } from "@/lib/env";
 import { SpeedInsights } from '@vercel/speed-insights/next';
+import { MouseProvider, CursorBlob, MouseTrail } from "@/components/mouse";
 
 // Lazy load Footer since it's below the fold
 const Footer = dynamic(() => import("@/components/Footer").then(mod => ({ default: mod.Footer })), {
@@ -73,20 +74,25 @@ export default function RootLayout({
       >
         <GA />
         <AdSenseScript />
-        <ThemeProvider
-          attribute="class"
-          defaultTheme="system"
-          enableSystem
-          disableTransitionOnChange
-        >
-          <div className="relative flex min-h-screen flex-col">
-            <Navigation />
-            <main className="flex-1">{children}</main>
-            <SpeedInsights />
-            <Footer />
-            <CookieConsent />
-          </div>
-        </ThemeProvider>
+        <MouseProvider>
+          {/* Mouse effects - rendered right after body for all pages */}
+          <CursorBlob />
+          <MouseTrail />
+          <ThemeProvider
+            attribute="class"
+            defaultTheme="system"
+            enableSystem
+            disableTransitionOnChange
+          >
+            <div className="relative flex min-h-screen flex-col">
+              <Navigation />
+              <main className="flex-1">{children}</main>
+              <SpeedInsights />
+              <Footer />
+              <CookieConsent />
+            </div>
+          </ThemeProvider>
+        </MouseProvider>
       </body>
     </html>
   );

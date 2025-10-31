@@ -6,8 +6,9 @@ import { cn } from '@/lib/utils'
 import { ThemeToggle } from './ThemeToggle'
 import { Button } from '@/components/ui/button'
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet'
-import { Menu } from 'lucide-react'
-import { useEffect } from 'react'
+import { Menu, Sparkles } from 'lucide-react'
+import { useEffect, useState } from 'react'
+import { useMouse } from '@/components/mouse'
 
 const navigation = [
   { name: 'Home', href: '/' },
@@ -22,6 +23,8 @@ const navigation = [
 
 export function Navigation() {
   const pathname = usePathname()
+  const { enabled, setEnabled } = useMouse()
+  const [isMobile, setIsMobile] = useState(false)
 
   // Prefetch important routes on mount for faster navigation
   useEffect(() => {
@@ -41,6 +44,19 @@ export function Navigation() {
     // Delay prefetch to not block initial load
     const timer = setTimeout(prefetchRoutes, 2000)
     return () => clearTimeout(timer)
+  }, [])
+
+  // Check if mobile on mount
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const checkMobile = () => {
+        setIsMobile(window.matchMedia('(pointer: coarse)').matches)
+      }
+      checkMobile()
+      const mediaQuery = window.matchMedia('(pointer: coarse)')
+      mediaQuery.addEventListener('change', checkMobile)
+      return () => mediaQuery.removeEventListener('change', checkMobile)
+    }
   }, [])
 
   return (
@@ -73,6 +89,29 @@ export function Navigation() {
           </div>
 
           <div className="flex items-center space-x-4">
+            {/* Effects Toggle - Hidden on mobile */}
+            {!isMobile && (
+              <Button
+                variant="ghost"
+                size="icon-sm"
+                onClick={() => setEnabled(!enabled)}
+                className={cn(
+                  'relative hidden sm:flex',
+                  enabled ? 'text-green-500 hover:text-green-600' : 'text-muted-foreground'
+                )}
+                title={enabled ? 'Disable effects' : 'Enable effects'}
+              >
+                <Sparkles className={cn(
+                  'h-4 w-4 transition-colors',
+                  enabled ? 'text-green-500' : 'text-muted-foreground'
+                )} />
+                <span className="sr-only">Toggle effects</span>
+                {enabled && (
+                  <span className="absolute top-1 right-1 h-1.5 w-1.5 rounded-full bg-green-500" />
+                )}
+              </Button>
+            )}
+            
             <ThemeToggle />
             
             {/* Mobile Navigation Sheet */}
@@ -111,11 +150,30 @@ export function Navigation() {
                     ))}
                   </nav>
                   
-                  <div className="pt-4 border-t">
+                  <div className="pt-4 border-t space-y-3">
                     <div className="flex items-center justify-between">
                       <span className="text-sm text-muted-foreground">Theme</span>
                       <ThemeToggle />
                     </div>
+                    {!isMobile && (
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm text-muted-foreground">Effects</span>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => setEnabled(!enabled)}
+                          className={cn(
+                            enabled ? 'text-green-500 hover:text-green-600' : 'text-muted-foreground'
+                          )}
+                        >
+                          <Sparkles className={cn(
+                            'h-4 w-4 mr-2',
+                            enabled ? 'text-green-500' : 'text-muted-foreground'
+                          )} />
+                          {enabled ? 'Enabled' : 'Disabled'}
+                        </Button>
+                      </div>
+                    )}
                   </div>
                 </div>
               </SheetContent>
