@@ -2,7 +2,7 @@
 
 import dynamic from 'next/dynamic'
 import { motion } from 'framer-motion'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { ArrowLeft, BookOpen, Download, GitCompare, Share2, Star, Users, Sparkles, Copy, Check, Twitter } from 'lucide-react'
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
@@ -10,10 +10,20 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Badge } from '@/components/ui/badge'
 import { CareerRoadmap } from '@/types/roadmap'
 import { Separator } from '@/components/ui/separator'
-import { BreadcrumbSchema, CourseSchema } from '@/components/JsonLd'
+import { BreadcrumbSchema, CourseSchema, FAQSchema } from '@/components/JsonLd'
+import { JsonLd as GenericJsonLd } from '@/components/seo/JsonLd'
 import { Breadcrumbs } from '@/components/Breadcrumbs'
-import { CompletionRing } from '@/components/CompletionRing'
-import { useRoadmapProgress } from '@/hooks/useRoadmapProgress'
+import { useProgress } from '@/hooks/useProgress'
+
+// Lazy-load noncritical components for better performance
+const CompletionRing = dynamic(() => import('@/components/progress/CompletionRing').then(mod => ({ default: mod.CompletionRing })), {
+  ssr: false,
+  loading: () => <div className="w-14 h-14 rounded-full border-4 border-gray-200 animate-pulse" />
+})
+
+const ShareBar = dynamic(() => import('@/components/share/ShareBar').then(mod => ({ default: mod.ShareBar })), {
+  ssr: false,
+})
 import { 
   copyRoadmapToClipboard, 
   getTwitterShareUrl, 
@@ -21,18 +31,8 @@ import {
 } from '@/lib/roadmap-actions'
 import { env, getSiteMetadata } from '@/lib/env'
 
-// Lazy load heavy components
-const RoadmapGraph = dynamic(() => import('@/components/RoadmapGraph').then(mod => ({ default: mod.RoadmapGraph })), {
-  loading: () => (
-    <div className="w-full h-[500px] flex items-center justify-center bg-gradient-to-br from-blue-50 to-purple-50 dark:from-gray-800 dark:to-gray-900 rounded-lg">
-      <div className="text-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-        <p className="text-sm text-gray-600 dark:text-gray-400">Loading interactive roadmap...</p>
-      </div>
-    </div>
-  ),
-  ssr: false
-})
+// Import RoadmapGraph directly (no longer lazy load for better UX)
+import { RoadmapGraph } from '@/components/RoadmapGraph'
 
 const AdTop = dynamic(() => import('@/components/ads').then(mod => ({ default: mod.AdTop })), { ssr: false })
 const AdInContent = dynamic(() => import('@/components/ads').then(mod => ({ default: mod.AdInContent })), { ssr: false })
@@ -44,18 +44,26 @@ interface RoadmapPageClientProps {
 
 export default function RoadmapPageClient({ roadmap }: RoadmapPageClientProps) {
   const [copied, setCopied] = useState(false)
+  const [mounted, setMounted] = useState(false)
   const siteMetadata = getSiteMetadata()
+
+  // Handle fade on career switch
+  useEffect(() => {
+    setMounted(true)
+    return () => setMounted(false)
+  }, [roadmap.slug])
   
-  // Progress tracking
-  const {
-    progress,
-    toggleStep,
-    completionPercentage,
-    completedCount,
-    totalSteps,
-    resetProgress,
-    isLoaded,
-  } = useRoadmapProgress(roadmap.slug, roadmap.steps.length)
+  // Progress tracking with new hook
+  const progress = useProgress(roadmap.slug)
+  
+  // Generate step IDs (using index as string for stability)
+  const getStepId = (index: number) => `step-${index}`
+
+  const handleResetProgress = () => {
+    if (confirm('Are you sure you want to reset all progress? This cannot be undone.')) {
+      progress.reset()
+    }
+  }
 
   const handleDownloadPDF = () => {
     // Placeholder for PDF download functionality
@@ -106,6 +114,23 @@ export default function RoadmapPageClient({ roadmap }: RoadmapPageClientProps) {
         url={`${siteMetadata.url}/roadmaps/${roadmap.slug}`}
       />
 
+      {/* WebPage JSON-LD */}
+      <GenericJsonLd
+        id={`webpage-${roadmap.slug}`}
+        data={{
+          '@type': 'WebPage',
+          name: `${roadmap.career} Roadmap`,
+          description: roadmap.tagline,
+          url: `${siteMetadata.url}/roadmaps/${roadmap.slug}`,
+          inLanguage: 'en-US',
+        }}
+      />
+
+      {/* FAQPage JSON-LD (if faqs array exists) */}
+      {(roadmap as any).faqs && Array.isArray((roadmap as any).faqs) && (roadmap as any).faqs.length > 0 && (
+        <FAQSchema questions={(roadmap as any).faqs} />
+      )}
+
       <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 dark:from-gray-900 dark:via-gray-800 dark:to-purple-900">
         {/* Top Ad - Below Header */}
         <AdTop />
@@ -147,6 +172,29 @@ export default function RoadmapPageClient({ roadmap }: RoadmapPageClientProps) {
               {roadmap.tagline}
             </p>
             
+            {/* Progress Ring */}
+            <div className="mt-6 flex flex-col items-center gap-3">
+              <div className="flex items-center gap-4">
+                <CompletionRing value={progress.percent(roadmap.steps.length)} size={56} />
+                <div className="text-left">
+                  <p className="text-sm font-medium text-gray-900 dark:text-white">Your progress</p>
+                  <p className="text-xs text-gray-600 dark:text-gray-400">
+                    {Object.values(progress.completed).filter(Boolean).length} of {roadmap.steps.length} steps
+                  </p>
+                </div>
+              </div>
+              {Object.values(progress.completed).some(Boolean) && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={handleResetProgress}
+                  className="text-xs text-muted-foreground hover:text-foreground"
+                >
+                  Reset progress
+                </Button>
+              )}
+            </div>
+            
             <div className="mt-6 flex flex-wrap items-center justify-center gap-3">
               <Badge variant="outline" className="text-sm">
                 {roadmap.steps.length} learning steps
@@ -158,25 +206,45 @@ export default function RoadmapPageClient({ roadmap }: RoadmapPageClientProps) {
           </div>
         </motion.div>
 
+        {/* Share Bar */}
+        <motion.div
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5, delay: 0.4 }}
+          className="mb-6"
+        >
+          <ShareBar title={`${roadmap.career} Roadmap`} />
+        </motion.div>
+
         {/* Main Content Grid */}
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 mt-12">
           {/* Main Content */}
           <div className="lg:col-span-8 space-y-8">
             {/* Interactive Roadmap Graph */}
             <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.8, delay: 0.4 }}
+              key={roadmap.slug}
+              initial={{ opacity: 0 }}
+              animate={{ opacity: mounted ? 1 : 0 }}
+              transition={{ duration: 0.3 }}
+              className="overflow-hidden"
             >
-              <Card className="bg-white/70 dark:bg-gray-900/70 backdrop-blur-sm border-0 overflow-hidden">
+              <Card className="bg-white/70 dark:bg-gray-900/70 backdrop-blur-sm border-0 overflow-visible">
                 <CardHeader>
                   <CardTitle className="text-2xl">Interactive Learning Path</CardTitle>
                   <CardDescription>
-                    Hover over or click the nodes to explore each step in detail
+                    Click the nodes to explore each step in detail
                   </CardDescription>
                 </CardHeader>
-                <CardContent className="p-0">
-                  <RoadmapGraph steps={roadmap.steps} />
+                <CardContent className="p-6 pb-8 min-h-[400px] md:min-h-[300px] overflow-visible">
+                  <div className="relative w-full overflow-visible" style={{ minHeight: '300px' }}>
+                    <RoadmapGraph 
+                      steps={roadmap.steps} 
+                      colorTheme="blue"
+                      careerSlug={roadmap.slug}
+                      onToggleStep={(stepId) => progress.toggle(stepId)}
+                      isStepDone={(stepId) => progress.completed[stepId] || false}
+                    />
+                  </div>
                 </CardContent>
               </Card>
             </motion.div>
@@ -184,11 +252,162 @@ export default function RoadmapPageClient({ roadmap }: RoadmapPageClientProps) {
             {/* In-Content Ad - After RoadmapGraph */}
             <AdInContent />
 
-            {/* Steps Overview */}
+            {/* Getting Started Section */}
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.8, delay: 0.6 }}
+            >
+              <Card className="bg-white/70 dark:bg-gray-900/70 backdrop-blur-sm border-0">
+                <CardHeader>
+                  <CardTitle>Getting Started</CardTitle>
+                  <CardDescription>
+                    Essential information to begin your journey
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="space-y-3">
+                    <div className="flex items-start gap-3">
+                      <div className="flex-shrink-0 w-6 h-6 rounded-full bg-blue-500 text-white flex items-center justify-center text-sm font-bold">
+                        1
+                      </div>
+                      <div>
+                        <h4 className="font-semibold mb-1">Set Up Your Learning Environment</h4>
+                        <p className="text-sm text-muted-foreground">
+                          Install the necessary tools and software mentioned in the first step. Create a dedicated workspace on your computer.
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex items-start gap-3">
+                      <div className="flex-shrink-0 w-6 h-6 rounded-full bg-blue-500 text-white flex items-center justify-center text-sm font-bold">
+                        2
+                      </div>
+                      <div>
+                        <h4 className="font-semibold mb-1">Follow the Steps Sequentially</h4>
+                        <p className="text-sm text-muted-foreground">
+                          Complete each step before moving to the next. The roadmap is designed to build knowledge progressively.
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex items-start gap-3">
+                      <div className="flex-shrink-0 w-6 h-6 rounded-full bg-blue-500 text-white flex items-center justify-center text-sm font-bold">
+                        3
+                      </div>
+                      <div>
+                        <h4 className="font-semibold mb-1">Track Your Progress</h4>
+                        <p className="text-sm text-muted-foreground">
+                          Use the progress tracker in the sidebar to mark completed steps and stay motivated.
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </motion.div>
+
+            {/* Projects Section */}
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.8, delay: 0.7 }}
+            >
+              <Card className="bg-white/70 dark:bg-gray-900/70 backdrop-blur-sm border-0">
+                <CardHeader>
+                  <CardTitle>Practice Projects</CardTitle>
+                  <CardDescription>
+                    Build real-world projects to solidify your skills
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="p-4 rounded-lg border-2 border-blue-200 dark:border-blue-800 bg-blue-50/50 dark:bg-blue-900/20">
+                      <h4 className="font-semibold mb-2">Beginner Project</h4>
+                      <p className="text-sm text-muted-foreground mb-3">
+                        Start with a simple project that covers the basics. Perfect for understanding fundamentals.
+                      </p>
+                      <Badge variant="secondary">After Step 3</Badge>
+                    </div>
+                    <div className="p-4 rounded-lg border-2 border-purple-200 dark:border-purple-800 bg-purple-50/50 dark:bg-purple-900/20">
+                      <h4 className="font-semibold mb-2">Intermediate Project</h4>
+                      <p className="text-sm text-muted-foreground mb-3">
+                        Challenge yourself with a more complex project that combines multiple concepts.
+                      </p>
+                      <Badge variant="secondary">After Step 5</Badge>
+                    </div>
+                    <div className="p-4 rounded-lg border-2 border-green-200 dark:border-green-800 bg-green-50/50 dark:bg-green-900/20 md:col-span-2">
+                      <h4 className="font-semibold mb-2">Portfolio Project</h4>
+                      <p className="text-sm text-muted-foreground mb-3">
+                        Build a comprehensive project that showcases all your skills. This will be your portfolio centerpiece.
+                      </p>
+                      <Badge variant="secondary">After Step {roadmap.steps.length}</Badge>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </motion.div>
+
+            {/* Checklist Section */}
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.8, delay: 0.8 }}
+            >
+              <Card className="bg-white/70 dark:bg-gray-900/70 backdrop-blur-sm border-0">
+                <CardHeader>
+                  <CardTitle>Learning Checklist</CardTitle>
+                  <CardDescription>
+                    Use this checklist to track your learning milestones
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-3">
+                    {roadmap.steps.map((step, index) => {
+                      const stepId = getStepId(index);
+                      const isCompleted = progress.completed[stepId] || false;
+                      
+                      return (
+                        <div
+                          key={index}
+                          className="flex items-start gap-3 p-3 rounded-lg border border-border hover:bg-accent/50 transition-colors"
+                          data-step-name={step.name}
+                          data-checklist-step={step.name}
+                          data-completed={isCompleted}
+                        >
+                          <div className="flex-shrink-0 mt-0.5">
+                            <input
+                              type="checkbox"
+                              checked={isCompleted}
+                              onChange={() => progress.toggle(stepId)}
+                              className="w-5 h-5 rounded border-2 border-gray-300 dark:border-gray-600 checked:bg-blue-600 checked:border-blue-600 focus:ring-2 focus:ring-blue-500"
+                              aria-checked={isCompleted}
+                            />
+                          </div>
+                          <div className="flex-1">
+                            <label className="font-medium cursor-pointer">
+                              Step {index + 1}: {step.name}
+                            </label>
+                            <p className="text-sm text-muted-foreground mt-1">
+                              {step.desc}
+                            </p>
+                            {step.resources.length > 0 && (
+                              <div className="mt-2 text-xs text-muted-foreground">
+                                Resources: {step.resources.join(', ')}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </CardContent>
+              </Card>
+            </motion.div>
+
+            {/* Steps Overview - Detailed View */}
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.8, delay: 0.9 }}
             >
               <Card className="bg-white/70 dark:bg-gray-900/70 backdrop-blur-sm border-0">
                 <CardHeader>
@@ -200,7 +419,8 @@ export default function RoadmapPageClient({ roadmap }: RoadmapPageClientProps) {
                 <CardContent>
                   <div className="space-y-4">
                     {roadmap.steps.map((step, index) => {
-                      const isCompleted = progress[index] || false
+                      const stepId = getStepId(index);
+                      const isCompleted = progress.completed[stepId] || false;
                       
                       return (
                         <div
@@ -210,7 +430,7 @@ export default function RoadmapPageClient({ roadmap }: RoadmapPageClientProps) {
                               ? 'bg-green-50 dark:bg-green-900/20 border-2 border-green-500'
                               : 'bg-gray-50 dark:bg-gray-800/50 hover:bg-gray-100 dark:hover:bg-gray-800 border-2 border-transparent'
                           }`}
-                          onClick={() => isLoaded && toggleStep(index)}
+                          onClick={() => progress.toggle(stepId)}
                         >
                           {/* Checkbox */}
                           <div className="flex-shrink-0">
@@ -222,7 +442,7 @@ export default function RoadmapPageClient({ roadmap }: RoadmapPageClientProps) {
                               }`}
                               onClick={(e) => {
                                 e.stopPropagation()
-                                if (isLoaded) toggleStep(index)
+                                progress.toggle(stepId)
                               }}
                             >
                               {isCompleted && (
@@ -242,11 +462,14 @@ export default function RoadmapPageClient({ roadmap }: RoadmapPageClientProps) {
 
                           {/* Step content */}
                           <div className="flex-1">
-                            <h4 className={`font-semibold mb-1 ${
-                              isCompleted
-                                ? 'text-green-900 dark:text-green-100 line-through'
-                                : 'text-gray-900 dark:text-white'
-                            }`}>
+                            <h4 
+                              className={`font-semibold mb-1 ${
+                                isCompleted
+                                  ? 'text-green-900 dark:text-green-100 line-through'
+                                  : 'text-gray-900 dark:text-white'
+                              }`}
+                              data-step-name={step.name}
+                            >
                               {step.name}
                             </h4>
                             <p className={`text-sm mb-2 ${
@@ -275,42 +498,7 @@ export default function RoadmapPageClient({ roadmap }: RoadmapPageClientProps) {
 
           {/* Sidebar */}
           <div className="lg:col-span-4 space-y-6">
-            {/* Progress Card */}
-            {isLoaded && (
-              <motion.div
-                initial={{ opacity: 0, x: 20 }}
-                animate={{ opacity: 1, x: 0 }}
-                transition={{ duration: 0.8, delay: 0.3 }}
-              >
-                <Card className="bg-white/70 dark:bg-gray-900/70 backdrop-blur-sm border-0">
-                  <CardHeader className="text-center">
-                    <CardTitle className="text-lg">Your Progress</CardTitle>
-                    <CardDescription>
-                      {completedCount} of {totalSteps} steps completed
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent className="flex flex-col items-center">
-                    <CompletionRing 
-                      percentage={completionPercentage} 
-                      size={140}
-                      strokeWidth={10}
-                    />
-                    <div className="mt-4 w-full space-y-2">
-                      {completedCount > 0 && (
-                        <Button
-                          onClick={resetProgress}
-                          variant="ghost"
-                          size="sm"
-                          className="w-full text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-100"
-                        >
-                          Reset Progress
-                        </Button>
-                      )}
-                    </div>
-                  </CardContent>
-                </Card>
-              </motion.div>
-            )}
+            {/* Progress Card - Removed duplicate (progress shown in header) */}
 
             {/* Quick Actions */}
             <motion.div

@@ -1,372 +1,499 @@
-'use client'
+'use client';
 
-import { useState, useEffect } from 'react'
-import { motion, AnimatePresence } from 'framer-motion'
-import { RoadmapStep } from '@/types/roadmap'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { Badge } from '@/components/ui/badge'
-import { Button } from '@/components/ui/button'
-import { ExternalLink, CheckCircle, Clock, BookOpen } from 'lucide-react'
+import { useState, useEffect, useRef } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { RoadmapStep } from '@/types/roadmap';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { ExternalLink, Check } from 'lucide-react';
+import { cn } from '@/lib/utils';
 
 interface RoadmapGraphProps {
-  steps: RoadmapStep[]
+  steps: RoadmapStep[];
+  colorTheme?: 'blue' | 'green' | 'orange';
+  showLineNumbers?: boolean;
+  compact?: boolean;
+  careerSlug: string;
+  onToggleStep?: (stepId: string) => void;
+  isStepDone?: (stepId: string) => boolean;
 }
 
-interface NodePosition {
-  x: number
-  y: number
-}
+const colorThemes = {
+  blue: {
+    node: 'from-indigo-500 to-cyan-400',
+    nodeHover: 'from-indigo-600 to-cyan-500',
+    line: 'from-indigo-400 to-cyan-300',
+    focus: 'focus:ring-indigo-500',
+  },
+  green: {
+    node: 'from-emerald-500 to-teal-400',
+    nodeHover: 'from-emerald-600 to-teal-500',
+    line: 'from-emerald-400 to-teal-300',
+    focus: 'focus:ring-emerald-500',
+  },
+  orange: {
+    node: 'from-orange-500 to-amber-400',
+    nodeHover: 'from-orange-600 to-amber-500',
+    line: 'from-orange-400 to-amber-300',
+    focus: 'focus:ring-orange-500',
+  },
+};
 
-export function RoadmapGraph({ steps }: RoadmapGraphProps) {
-  const [hoveredStep, setHoveredStep] = useState<number | null>(null)
-  const [selectedStep, setSelectedStep] = useState<number | null>(null)
-  const [isMobile, setIsMobile] = useState(false)
-  const [containerSize, setContainerSize] = useState({ width: 0, height: 0 })
+export function RoadmapGraph({ 
+  steps, 
+  colorTheme = 'blue',
+  showLineNumbers = false,
+  compact = false,
+  careerSlug,
+  onToggleStep,
+  isStepDone,
+}: RoadmapGraphProps) {
+  const [selectedStep, setSelectedStep] = useState<number | null>(null);
+  const [isMobile, setIsMobile] = useState(false);
+  const [prefersReducedMotion, setPrefersReducedMotion] = useState(false);
+  const nodeRefs = useRef<(HTMLButtonElement | null)[]>([]);
+  const cardRefs = useRef<(HTMLDivElement | null)[]>([]);
 
-  // Check if mobile and handle resize
+  // Initialize from sessionStorage
   useEffect(() => {
-    const checkMobile = () => {
-      setIsMobile(window.innerWidth < 768)
-    }
-    
-    checkMobile()
-    window.addEventListener('resize', checkMobile)
-    return () => window.removeEventListener('resize', checkMobile)
-  }, [])
+    if (typeof window === 'undefined') return;
 
-  // Calculate container size
-  useEffect(() => {
-    const updateSize = () => {
-      const container = document.getElementById('roadmap-container')
-      if (container) {
-        setContainerSize({
-          width: container.offsetWidth,
-          height: container.offsetHeight
-        })
+    const stored = sessionStorage.getItem('roadmap-selected-step');
+    if (stored !== null) {
+      const index = parseInt(stored, 10);
+      if (index >= 0 && index < steps.length) {
+        setSelectedStep(index);
       }
     }
+  }, [steps.length]);
 
-    updateSize()
-    window.addEventListener('resize', updateSize)
-    return () => window.removeEventListener('resize', updateSize)
-  }, [])
+  // Persist to sessionStorage
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
 
-  // Calculate node positions
-  const getNodePositions = (): NodePosition[] => {
-    if (isMobile) {
-      // Vertical flow for mobile
-      return steps.map((_, index) => ({
-        x: containerSize.width / 2,
-        y: 100 + (index * 200)
-      }))
+    if (selectedStep !== null) {
+      sessionStorage.setItem('roadmap-selected-step', selectedStep.toString());
     } else {
-      // Horizontal/zig-zag flow for desktop
-      return steps.map((_, index) => {
-        const isEven = index % 2 === 0
-        const x = 100 + (index * 200)
-        const y = isEven ? 150 : 350
-        return { x, y }
-      })
+      sessionStorage.removeItem('roadmap-selected-step');
     }
-  }
+  }, [selectedStep]);
 
-  const nodePositions = getNodePositions()
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
 
-  // Generate SVG path for connections
-  const getConnectionPath = (): string => {
-    if (nodePositions.length < 2) return ''
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth < 768);
+    };
 
-    let path = `M ${nodePositions[0].x} ${nodePositions[0].y}`
-    
-    for (let i = 1; i < nodePositions.length; i++) {
-      const current = nodePositions[i]
-      const previous = nodePositions[i - 1]
-      
-      if (isMobile) {
-        // Straight vertical lines for mobile
-        path += ` L ${current.x} ${current.y}`
-      } else {
-        // Curved lines for desktop
-        const midX = (previous.x + current.x) / 2
-        const midY = (previous.y + current.y) / 2
-        const controlY = Math.abs(current.y - previous.y) > 100 ? midY + 50 : midY
-        
-        path += ` Q ${midX} ${controlY} ${current.x} ${current.y}`
-      }
+    const checkReducedMotion = () => {
+      setPrefersReducedMotion(
+        window.matchMedia('(prefers-reduced-motion: reduce)').matches
+      );
+    };
+
+    checkMobile();
+    checkReducedMotion();
+
+    window.addEventListener('resize', checkMobile);
+    const mediaQuery = window.matchMedia('(prefers-reduced-motion: reduce)');
+    mediaQuery.addEventListener('change', checkReducedMotion);
+
+    return () => {
+      window.removeEventListener('resize', checkMobile);
+      mediaQuery.removeEventListener('change', checkReducedMotion);
+    };
+  }, []);
+
+  // Scroll into view when step is selected (mobile)
+  useEffect(() => {
+    if (selectedStep !== null && isMobile && cardRefs.current[selectedStep]) {
+      const timer = setTimeout(() => {
+        cardRefs.current[selectedStep]?.scrollIntoView({
+          behavior: prefersReducedMotion ? 'auto' : 'smooth',
+          block: 'center',
+          inline: 'nearest',
+        });
+      }, 100);
+      return () => clearTimeout(timer);
     }
-    
-    return path
-  }
+  }, [selectedStep, isMobile, prefersReducedMotion]);
 
+  const theme = colorThemes[colorTheme];
+  const nodeSize = compact ? 'w-12 h-12' : 'w-16 h-16';
+  const nodeGap = compact ? 'gap-4 md:gap-6' : 'gap-8 md:gap-12';
+  const lineWidth = compact ? 'w-8 md:w-10' : 'w-12 md:w-16';
+
+  // Generate step ID (use step.id if available, fallback to index)
+  const getStepId = (index: number) => {
+    const step = steps[index];
+    return (step as any)?.id || `step-${index}`;
+  };
+
+  // Animation variants
   const containerVariants = {
     hidden: { opacity: 0 },
     visible: {
       opacity: 1,
       transition: {
-        staggerChildren: 0.2,
-        delayChildren: 0.1
-      }
-    }
-  }
+        staggerChildren: prefersReducedMotion ? 0 : 0.15,
+        delayChildren: prefersReducedMotion ? 0 : 0.1,
+      },
+    },
+  };
 
   const nodeVariants = {
-    hidden: { 
-      scale: 0, 
+    hidden: {
+      scale: prefersReducedMotion ? 1 : 0,
       opacity: 0,
-      y: 50
+      y: prefersReducedMotion ? 0 : 50,
     },
     visible: (index: number) => ({
       scale: 1,
       opacity: 1,
       y: 0,
-      transition: {
-        type: "spring" as const,
-        stiffness: 300,
-        damping: 20,
-        delay: index * 0.1
-      }
+      transition: prefersReducedMotion
+        ? { duration: 0 }
+        : {
+            type: 'spring',
+            stiffness: 200,
+            damping: 20,
+            delay: index * 0.1,
+          },
     }),
     hover: {
       scale: 1.1,
-      transition: {
-        type: "spring" as const,
-        stiffness: 400,
-        damping: 10
-      }
+      transition: prefersReducedMotion
+        ? { duration: 0 }
+        : {
+            type: 'spring',
+            stiffness: 400,
+            damping: 15,
+          },
     },
-    tap: {
-      scale: 0.95,
-      transition: {
-        type: "spring" as const,
-        stiffness: 400,
-        damping: 10
-      }
-    }
-  }
+  };
 
-  const pathVariants = {
-    hidden: { pathLength: 0, opacity: 0 },
+  const glowVariants = {
+    inactive: {
+      boxShadow: prefersReducedMotion 
+        ? '0 0 0px rgba(59, 130, 246, 0)'
+        : [
+            '0 0 0px rgba(59, 130, 246, 0)',
+            '0 0 20px rgba(59, 130, 246, 0.3)',
+            '0 0 0px rgba(59, 130, 246, 0)',
+          ],
+    },
+    active: {
+      boxShadow: prefersReducedMotion
+        ? '0 0 15px rgba(59, 130, 246, 0.4)'
+        : [
+            '0 0 0px rgba(59, 130, 246, 0)',
+            '0 0 25px rgba(59, 130, 246, 0.6)',
+            '0 0 0px rgba(59, 130, 246, 0)',
+          ],
+      transition: prefersReducedMotion
+        ? { duration: 0 }
+        : {
+            duration: 2,
+            repeat: Infinity,
+            ease: 'easeInOut',
+          },
+    },
+    completed: {
+      boxShadow: '0 0 15px rgba(34, 197, 94, 0.4)',
+    },
+  };
+
+  const lineVariants = {
+    hidden: {
+      scaleX: prefersReducedMotion ? 1 : 0,
+      opacity: 0,
+    },
     visible: {
-      pathLength: 1,
+      scaleX: 1,
       opacity: 1,
-      transition: {
-        duration: 1.5,
-        ease: "easeInOut" as const,
-        delay: 0.5
-      }
-    }
-  }
+      transition: prefersReducedMotion
+        ? { duration: 0 }
+        : {
+            duration: 0.8,
+            ease: 'easeInOut',
+          },
+    },
+  };
 
-  const tooltipVariants = {
-    hidden: { 
-      opacity: 0, 
-      scale: 0.8,
-      y: 20
+  const cardVariants = {
+    hidden: {
+      opacity: 0,
+      height: 0,
+      y: -20,
     },
     visible: {
       opacity: 1,
-      scale: 1,
+      height: 'auto',
       y: 0,
-      transition: {
-        type: "spring" as const,
-        stiffness: 300,
-        damping: 25
+      transition: prefersReducedMotion
+        ? { duration: 0 }
+        : {
+            type: 'spring',
+            stiffness: 300,
+            damping: 30,
+          },
+    },
+    exit: {
+      opacity: 0,
+      height: 0,
+      y: -20,
+      transition: prefersReducedMotion
+        ? { duration: 0 }
+        : {
+            duration: 0.2,
+          },
+    },
+  };
+
+  const handleNodeClick = (index: number) => {
+    setSelectedStep(selectedStep === index ? null : index);
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent, index: number) => {
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      handleNodeClick(index);
+    } else if (e.key === 'ArrowRight' && !isMobile) {
+      e.preventDefault();
+      const nextIndex = index < steps.length - 1 ? index + 1 : 0;
+      nodeRefs.current[nextIndex]?.focus();
+    } else if (e.key === 'ArrowLeft' && !isMobile) {
+      e.preventDefault();
+      const prevIndex = index > 0 ? index - 1 : steps.length - 1;
+      nodeRefs.current[prevIndex]?.focus();
+    }
+  };
+
+  const handleCheckboxKeyDown = (e: React.KeyboardEvent, stepId: string) => {
+    if (e.key === ' ' || e.key === 'Enter') {
+      e.preventDefault();
+      if (onToggleStep) {
+        onToggleStep(stepId);
+        // Analytics
+        console.info('step_completed', { stepId, careerSlug });
       }
     }
-  }
+  };
+
+  const handleCheckboxChange = (stepId: string) => {
+    if (onToggleStep) {
+      onToggleStep(stepId);
+      // Analytics
+      console.info('step_completed', { stepId, careerSlug });
+    }
+  };
 
   return (
-    <div className="relative w-full min-h-[600px] p-4">
+    <div className="relative w-full py-8 px-4 overflow-visible">
       <motion.div
-        id="roadmap-container"
-        className="relative w-full h-full"
         variants={containerVariants}
         initial="hidden"
         animate="visible"
+        className={cn(
+          'flex relative',
+          nodeGap,
+          isMobile ? 'flex-col items-center' : 'flex-row items-center justify-center flex-wrap'
+        )}
+        style={{ minHeight: '300px' }}
       >
-        {/* SVG Connection Lines */}
-        <svg
-          className="absolute inset-0 w-full h-full pointer-events-none"
-          style={{ zIndex: 1 }}
-        >
-          <motion.path
-            d={getConnectionPath()}
-            stroke="url(#gradient)"
-            strokeWidth="3"
-            fill="none"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            variants={pathVariants}
-            initial="hidden"
-            animate="visible"
-          />
-          <defs>
-            <linearGradient id="gradient" x1="0%" y1="0%" x2="100%" y2="0%">
-              <stop offset="0%" stopColor="#3b82f6" />
-              <stop offset="50%" stopColor="#8b5cf6" />
-              <stop offset="100%" stopColor="#06b6d4" />
-            </linearGradient>
-          </defs>
-        </svg>
+        {steps.map((step, index) => {
+          const isSelected = selectedStep === index;
+          const isLast = index === steps.length - 1;
+          const stepId = getStepId(index);
+          const isDone = isStepDone ? isStepDone(stepId) : false;
 
-        {/* Roadmap Nodes */}
-        {steps.map((step, index) => (
-          <motion.div
-            key={index}
-            className="absolute"
-            style={{
-              left: nodePositions[index]?.x - 30,
-              top: nodePositions[index]?.y - 30,
-              zIndex: 10
-            }}
-            variants={nodeVariants}
-            custom={index}
-            whileHover="hover"
-            whileTap="tap"
-            onHoverStart={() => setHoveredStep(index)}
-            onHoverEnd={() => setHoveredStep(null)}
-            onClick={() => setSelectedStep(selectedStep === index ? null : index)}
-          >
-            {/* Node Circle */}
-            <motion.div
-              className={`
-                w-16 h-16 rounded-full flex items-center justify-center cursor-pointer
-                shadow-lg border-4 border-white dark:border-gray-800
-                ${selectedStep === index 
-                  ? 'bg-gradient-to-r from-blue-600 to-purple-600' 
-                  : 'bg-gradient-to-r from-blue-500 to-purple-500'
-                }
-              `}
-              whileHover={{
-                boxShadow: "0 0 20px rgba(59, 130, 246, 0.5)"
-              }}
-            >
-              <span className="text-white font-bold text-lg">
-                {index + 1}
-              </span>
-            </motion.div>
+          return (
+            <div key={index} className="flex flex-col items-center relative">
+              {/* Line Number (optional) */}
+              {showLineNumbers && !isMobile && (
+                <motion.div
+                  className="absolute -top-6 left-1/2 -translate-x-1/2 text-xs font-medium text-muted-foreground"
+                  initial={{ opacity: 0, y: -10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: index * 0.1 + 0.3 }}
+                >
+                  {index + 1}
+                </motion.div>
+              )}
 
-            {/* Step Label */}
-            <motion.div
-              className="absolute top-20 left-1/2 transform -translate-x-1/2 w-48 text-center"
-              initial={{ opacity: 0, y: -10 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: index * 0.1 + 0.3 }}
-            >
-              <h3 className="text-sm font-semibold text-gray-900 dark:text-white mb-1">
-                {step.name}
-              </h3>
-              <p className="text-xs text-gray-600 dark:text-gray-300 leading-tight">
-                {step.desc}
-              </p>
-            </motion.div>
-          </motion.div>
-        ))}
+              {/* Node Circle */}
+              <motion.button
+                ref={(el) => {
+                  nodeRefs.current[index] = el;
+                }}
+                className={cn(
+                  nodeSize,
+                  'rounded-full flex items-center justify-center text-sm font-medium',
+                  'text-white shadow-lg hover:shadow-xl transition-all',
+                  `bg-gradient-to-br ${theme.node}`,
+                  `focus:outline-none focus:ring-2 ${theme.focus} focus:ring-offset-2`,
+                  'relative z-10',
+                  isDone && 'opacity-90'
+                )}
+                variants={nodeVariants}
+                custom={index}
+                whileHover="hover"
+                onClick={() => handleNodeClick(index)}
+                onKeyDown={(e) => handleKeyDown(e, index)}
+                aria-label={`Step ${index + 1}: ${step.name}`}
+                aria-expanded={isSelected}
+                tabIndex={0}
+                animate={isDone ? 'completed' : isSelected ? 'active' : 'inactive'}
+              >
+                {/* Glow pulse effect for active node (reduced if completed) */}
+                {isSelected && !isDone && (
+                  <motion.div
+                    className={cn(
+                      'absolute inset-0 rounded-full',
+                      `bg-gradient-to-br ${theme.node}`
+                    )}
+                    variants={glowVariants}
+                    animate="active"
+                    style={{ opacity: 0.5 }}
+                  />
+                )}
+                {/* Success ring for completed steps */}
+                {isDone && (
+                  <motion.div
+                    className="absolute inset-0 rounded-full border-2 border-green-500"
+                    variants={glowVariants}
+                    animate="completed"
+                  />
+                )}
+                <span className={cn(
+                  'relative z-10 font-semibold',
+                  compact ? 'text-base' : 'text-lg'
+                )}>
+                  {index + 1}
+                </span>
+                {/* Completed check badge */}
+                {isDone && (
+                  <motion.div
+                    className="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-green-500 flex items-center justify-center shadow-md"
+                    initial={{ scale: 0 }}
+                    animate={{ scale: 1 }}
+                    transition={{ type: 'spring', stiffness: 400, damping: 15 }}
+                  >
+                    <Check className="w-3 h-3 text-white" />
+                  </motion.div>
+                )}
+              </motion.button>
 
-        {/* Floating Tooltip/Card */}
-        <AnimatePresence>
-          {(hoveredStep !== null || selectedStep !== null) && (
-            <motion.div
-              className="absolute z-50"
-              style={{
-                left: nodePositions[hoveredStep ?? selectedStep ?? 0]?.x + 50,
-                top: nodePositions[hoveredStep ?? selectedStep ?? 0]?.y - 50,
-                transform: 'translateX(-50%)'
-              }}
-              variants={tooltipVariants}
-              initial="hidden"
-              animate="visible"
-              exit="hidden"
-            >
-              <Card className="w-80 bg-white/95 dark:bg-gray-900/95 backdrop-blur-sm border-0 shadow-xl">
-                <CardHeader className="pb-3">
-                  <div className="flex items-center gap-2 mb-2">
-                    <div className="w-8 h-8 rounded-full bg-gradient-to-r from-blue-600 to-purple-600 flex items-center justify-center">
-                      <span className="text-white font-bold text-sm">
-                        {(hoveredStep ?? selectedStep ?? 0) + 1}
-                      </span>
-                    </div>
-                    <CardTitle className="text-lg">
-                      {steps[hoveredStep ?? selectedStep ?? 0]?.name}
-                    </CardTitle>
-                  </div>
-                  <CardDescription className="text-sm">
-                    {steps[hoveredStep ?? selectedStep ?? 0]?.desc}
-                  </CardDescription>
-                </CardHeader>
-                
-                <CardContent className="pt-0">
-                  <div className="space-y-3">
-                    <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-300">
-                      <BookOpen className="h-4 w-4" />
-                      <span>Resources ({steps[hoveredStep ?? selectedStep ?? 0]?.resources.length})</span>
-                    </div>
-                    
-                    <div className="space-y-2">
-                      {steps[hoveredStep ?? selectedStep ?? 0]?.resources.map((resource, resourceIndex) => (
-                        <motion.div
-                          key={resourceIndex}
-                          initial={{ opacity: 0, x: -10 }}
-                          animate={{ opacity: 1, x: 0 }}
-                          transition={{ delay: resourceIndex * 0.1 }}
-                        >
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            className="w-full justify-start text-left h-auto p-3"
-                            onClick={() => window.open(`https://www.google.com/search?q=${encodeURIComponent(resource)}`, '_blank')}
-                          >
-                            <div className="flex items-center gap-2 w-full">
-                              <span className="text-sm flex-1 truncate">{resource}</span>
-                              <ExternalLink className="h-3 w-3 flex-shrink-0" />
-                            </div>
-                          </Button>
-                        </motion.div>
-                      ))}
-                    </div>
-                    
-                    <div className="pt-2 border-t border-gray-200 dark:border-gray-700">
-                      <div className="flex items-center justify-between text-xs text-gray-500">
-                        <span>Step {(hoveredStep ?? selectedStep ?? 0) + 1} of {steps.length}</span>
-                        <div className="flex items-center gap-1">
-                          <Clock className="h-3 w-3" />
-                          <span>Click to select</span>
+              {/* Connector Line (horizontal on desktop, vertical on mobile) */}
+              {!isLast && (
+                <motion.div
+                  className={cn(
+                    'h-[2px] flex-1',
+                    `bg-gradient-to-r ${theme.line}`,
+                    isMobile ? 'w-[2px] h-16 my-2' : lineWidth
+                  )}
+                  style={isMobile ? {} : { minWidth: compact ? '32px' : '48px' }}
+                  variants={lineVariants}
+                  initial="hidden"
+                  animate="visible"
+                />
+              )}
+
+              {/* Expanded Card Below Node - Use layout animation to prevent CLS */}
+              <motion.div
+                ref={(el) => {
+                  cardRefs.current[index] = el;
+                }}
+                className={cn(
+                  'mt-4 w-full max-w-sm z-50',
+                  isMobile ? 'w-full' : 'w-full',
+                  // Reserve space to prevent CLS
+                  !isSelected && 'min-h-0'
+                )}
+                layout
+                animate={{
+                  height: isSelected ? 'auto' : 0,
+                }}
+                transition={prefersReducedMotion ? { duration: 0 } : {
+                  type: 'spring',
+                  stiffness: 300,
+                  damping: 30,
+                }}
+                style={{ zIndex: 50, overflow: 'hidden' }}
+              >
+                <AnimatePresence>
+                  {isSelected && (
+                    <motion.div
+                      variants={cardVariants}
+                      initial="hidden"
+                      animate="visible"
+                      exit="exit"
+                    >
+                    <Card className="p-4 rounded-2xl bg-card text-card-foreground shadow-md border border-border">
+                      <CardHeader className="p-0 pb-3">
+                        <CardTitle className="text-xl">{step.name}</CardTitle>
+                        <p className="text-sm text-muted-foreground mt-2">
+                          {step.desc}
+                        </p>
+                      </CardHeader>
+                      <CardContent className="p-0 pt-3">
+                        {/* Mark step complete checkbox */}
+                        {onToggleStep && (
+                          <div className="mb-4 pb-4 border-b border-border">
+                            <label className="flex items-center gap-2 cursor-pointer group">
+                              <input
+                                type="checkbox"
+                                checked={isDone || false}
+                                onChange={() => handleCheckboxChange(stepId)}
+                                onKeyDown={(e) => handleCheckboxKeyDown(e, stepId)}
+                                className="w-4 h-4 rounded border-2 border-gray-300 dark:border-gray-600 checked:bg-blue-600 checked:border-blue-600 focus:ring-2 focus:ring-blue-500 cursor-pointer"
+                                tabIndex={0}
+                              />
+                              <span className="text-sm font-medium text-foreground group-hover:text-primary transition-colors">
+                                Mark step complete
+                              </span>
+                            </label>
+                          </div>
+                        )}
+                        
+                        <div className="space-y-2">
+                          <h4 className="text-sm font-semibold mb-3">
+                            Resources:
+                          </h4>
+                          <div className="space-y-2">
+                            {step.resources.map((resource, resourceIndex) => (
+                              <motion.a
+                                key={resourceIndex}
+                                href={`https://www.google.com/search?q=${encodeURIComponent(resource)}`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="flex items-center gap-2 p-2 rounded-md bg-accent hover:bg-accent/80 transition-colors text-sm"
+                                whileHover={
+                                  prefersReducedMotion
+                                    ? {}
+                                    : { scale: 1.02, x: 4 }
+                                }
+                                transition={
+                                  prefersReducedMotion
+                                    ? { duration: 0 }
+                                    : { duration: 0.2 }
+                                }
+                              >
+                                <span className="flex-1">{resource}</span>
+                                <ExternalLink className="h-4 w-4 flex-shrink-0" />
+                              </motion.a>
+                            ))}
+                          </div>
                         </div>
-                      </div>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            </motion.div>
-          )}
-        </AnimatePresence>
-
-        {/* Progress Indicator */}
-        <motion.div
-          className="absolute top-4 right-4 bg-white/90 dark:bg-gray-800/90 backdrop-blur-sm rounded-lg p-3 shadow-lg"
-          initial={{ opacity: 0, x: 20 }}
-          animate={{ opacity: 1, x: 0 }}
-          transition={{ delay: 0.5 }}
-        >
-          <div className="flex items-center gap-2 text-sm">
-            <CheckCircle className="h-4 w-4 text-green-500" />
-            <span className="font-medium">
-              {selectedStep !== null ? selectedStep + 1 : 0} / {steps.length} completed
-            </span>
-          </div>
-          <div className="w-32 h-2 bg-gray-200 dark:bg-gray-700 rounded-full mt-2">
-            <motion.div
-              className="h-full bg-gradient-to-r from-blue-500 to-purple-500 rounded-full"
-              initial={{ width: 0 }}
-              animate={{ 
-                width: `${selectedStep !== null ? ((selectedStep + 1) / steps.length) * 100 : 0}%` 
-              }}
-              transition={{ duration: 0.5 }}
-            />
-          </div>
-        </motion.div>
+                      </CardContent>
+                    </Card>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </motion.div>
+            </div>
+          );
+        })}
       </motion.div>
     </div>
-  )
+  );
 }
-

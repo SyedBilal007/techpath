@@ -1,0 +1,252 @@
+/* Print Styles for Roadmap Pages */
+
+@media print {
+  /* Hide navigation, header, footer, and UI elements */
+  nav,
+  header,
+  footer,
+  [class*="Navigation"],
+  [class*="Header"],
+  [class*="Footer"],
+  [class*="AdTop"],
+  [class*="AdInContent"],
+  [class*="AdStickyMobile"],
+  [data-mouse-effects],
+  [class*="CursorBlob"],
+  [class*="MouseTrail"],
+  [class*="CookieConsent"],
+  button,
+  [role="button"]:not([data-print-keep]),
+  .no-print {
+    display: none !important;
+    visibility: hidden !important;
+  }
+
+  /* Hide theme toggle, share buttons, and other interactive elements */
+  [class*="ThemeToggle"],
+  [class*="ShareBar"],
+  [class*="QuickActions"],
+  [class*="Progress"]:not([data-print-keep]),
+  [class*="CompletionRing"],
+  [class*="Tooltip"],
+  [class*="Badge"]:not([data-print-keep]) {
+    display: none !important;
+  }
+
+  /* Reset body and container styles */
+  body {
+    background: white !important;
+    color: black !important;
+    font-size: 12pt !important;
+    line-height: 1.5 !important;
+  }
+
+  /* Container adjustments */
+  .container {
+    max-width: 100% !important;
+    padding: 0 !important;
+    margin: 0 !important;
+  }
+
+  /* Page breaks */
+  .page-break {
+    page-break-after: always;
+  }
+
+  /* Roadmap title and metadata */
+  h1 {
+    font-size: 24pt !important;
+    font-weight: bold !important;
+    margin-bottom: 12pt !important;
+    color: black !important;
+    page-break-after: avoid;
+  }
+
+  h2 {
+    font-size: 18pt !important;
+    font-weight: bold !important;
+    margin-top: 16pt !important;
+    margin-bottom: 8pt !important;
+    color: black !important;
+    page-break-after: avoid;
+  }
+
+  /* Career tagline */
+  [class*="tagline"],
+  p[class*="Tagline"] {
+    font-size: 14pt !important;
+    color: #333 !important;
+    margin-bottom: 16pt !important;
+  }
+
+  /* Expand steps into single-column list */
+  [class*="RoadmapGraph"],
+  [class*="StepsOverview"],
+  [class*="Checklist"] {
+    display: block !important;
+  }
+
+  /* Step items - clean single column layout */
+  [data-step-name],
+  [data-checklist-step],
+  [class*="StepItem"],
+  [class*="step-item"] {
+    display: block !important;
+    page-break-inside: avoid;
+    margin-bottom: 12pt !important;
+    padding: 8pt !important;
+    border-bottom: 1pt solid #ddd !important;
+  }
+
+  /* Step number and name */
+  [class*="step-number"],
+  [class*="StepNumber"] {
+    display: inline-block !important;
+    font-weight: bold !important;
+    margin-right: 8pt !important;
+    color: black !important;
+  }
+
+  /* Step name */
+  [class*="step-name"],
+  [class*="StepName"],
+  h3[class*="step"],
+  h4[class*="step"] {
+    display: inline-block !important;
+    font-size: 14pt !important;
+    font-weight: bold !important;
+    color: black !important;
+    margin: 0 !important;
+  }
+
+  /* Completion indicator (✓) */
+  [class*="completed"],
+  [class*="done"],
+  [data-completed="true"],
+  input[type="checkbox"]:checked + *::before,
+  [class*="Check"] {
+    display: inline-block !important;
+    margin-left: 8pt !important;
+    color: green !important;
+  }
+
+  input[type="checkbox"]:checked::after {
+    content: "✓" !important;
+    color: green !important;
+    font-weight: bold !important;
+    margin-left: 4pt !important;
+  }
+
+  /* Step description */
+  [class*="step-desc"],
+  [class*="StepDesc"],
+  p[class*="description"] {
+    font-size: 11pt !important;
+    color: #555 !important;
+    margin: 4pt 0 8pt 0 !important;
+    line-height: 1.4 !important;
+  }
+
+  /* Resources section */
+  [class*="resources"],
+  [class*="Resources"] {
+    margin-top: 8pt !important;
+    margin-left: 16pt !important;
+  }
+
+  [class*="resource-item"],
+  a[class*="resource"] {
+    display: block !important;
+    font-size: 10pt !important;
+    color: #333 !important;
+    margin: 2pt 0 !important;
+    text-decoration: none !important;
+  }
+
+  /* Hide interactive elements but keep content */
+  [class*="Card"] {
+    border: none !important;
+    box-shadow: none !important;
+    background: transparent !important;
+    page-break-inside: avoid;
+  }
+
+  [class*="CardHeader"],
+  [class*="CardContent"] {
+    padding: 0 !important;
+  }
+
+  /* Remove gradients and colors */
+  [class*="gradient"],
+  [class*="bg-gradient"] {
+    background: transparent !important;
+    color: black !important;
+  }
+
+  /* Hide decorative elements */
+  [class*="badge"],
+  [class*="Badge"]:not([data-print-keep]),
+  [class*="sparkles"],
+  [class*="icon"] {
+    display: none !important;
+  }
+
+  /* Show completion checkmarks */
+  [data-completed="true"]::before,
+  [aria-checked="true"]::before,
+  input[type="checkbox"]:checked ~ *::before {
+    content: "✓ " !important;
+    color: green !important;
+    font-weight: bold !important;
+  }
+
+  /* Links - make them visible but remove underline in print */
+  a {
+    color: black !important;
+    text-decoration: underline !important;
+  }
+
+  a[href^="http"]::after {
+    content: " (" attr(href) ")" !important;
+    font-size: 9pt !important;
+    color: #666 !important;
+  }
+
+  /* Ensure proper page breaks */
+  section,
+  [class*="section"] {
+    page-break-inside: avoid;
+  }
+
+  /* Footer for printed pages */
+  @page {
+    margin: 1.5cm;
+    size: A4;
+  }
+
+  /* Print header/footer (if browser supports it) */
+  @page {
+    @top-center {
+      content: element(page-header);
+    }
+    @bottom-center {
+      content: element(page-footer);
+    }
+  }
+
+  /* Hide sidebar and grid layouts */
+  [class*="sidebar"],
+  [class*="Sidebar"],
+  [class*="grid-cols"],
+  [class*="lg:grid-cols"] {
+    display: block !important;
+    width: 100% !important;
+  }
+
+  /* Single column layout */
+  [class*="col-span"] {
+    width: 100% !important;
+    max-width: 100% !important;
+  }
+}
+

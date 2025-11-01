@@ -1,6 +1,7 @@
 import { Metadata } from 'next'
 import { notFound } from 'next/navigation'
 import { getRoadmapBySlug, getCareerSlugs } from '@/lib/roadmaps'
+import { getSiteMetadata } from '@/lib/env'
 import RoadmapPageClient from './RoadmapPageClient'
 
 interface RoadmapPageProps {
@@ -20,6 +21,9 @@ export async function generateStaticParams() {
 // Generate metadata for each career page
 export async function generateMetadata({ params }: RoadmapPageProps): Promise<Metadata> {
   const roadmap = getRoadmapBySlug(params.career)
+  const siteMetadata = getSiteMetadata()
+  const pageUrl = `${siteMetadata.url}/roadmaps/${params.career}`
+  const ogImage = siteMetadata.ogImage || `${siteMetadata.url}/og-image.png`
 
   if (!roadmap) {
     return {
@@ -29,16 +33,20 @@ export async function generateMetadata({ params }: RoadmapPageProps): Promise<Me
   }
 
   return {
-    title: `${roadmap.career} Roadmap | TechPath`,
+    title: `${roadmap.career} Roadmap | ${siteMetadata.name}`,
     description: `${roadmap.tagline} - Learn ${roadmap.career} with our comprehensive ${roadmap.steps.length}-step roadmap and curated resources.`,
+    alternates: {
+      canonical: pageUrl,
+    },
     openGraph: {
-      title: `${roadmap.career} Roadmap | TechPath`,
+      title: `${roadmap.career} Roadmap | ${siteMetadata.name}`,
       description: roadmap.tagline,
       type: 'website',
-      url: `https://techpath.dev/roadmaps/${params.career}`,
+      url: pageUrl,
+      siteName: siteMetadata.name,
       images: [
         {
-          url: '/og-image.png',
+          url: ogImage,
           width: 1200,
           height: 630,
           alt: `${roadmap.career} Roadmap`,
@@ -47,9 +55,9 @@ export async function generateMetadata({ params }: RoadmapPageProps): Promise<Me
     },
     twitter: {
       card: 'summary_large_image',
-      title: `${roadmap.career} Roadmap | TechPath`,
+      title: `${roadmap.career} Roadmap | ${siteMetadata.name}`,
       description: roadmap.tagline,
-      images: ['/og-image.png'],
+      images: [ogImage],
     },
     keywords: [
       roadmap.career,

@@ -1,0 +1,2 @@
+export { ShareBar } from './ShareBar';
+

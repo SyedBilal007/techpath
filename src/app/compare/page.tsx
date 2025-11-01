@@ -1,318 +1,374 @@
-'use client'
+'use client';
 
-import { motion } from 'framer-motion'
-import { useState } from 'react'
-import { ArrowRight, CheckCircle, X } from 'lucide-react'
-import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { Badge } from '@/components/ui/badge'
-import { getCareers } from '@/lib/roadmaps'
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select'
-import Link from 'next/link'
+import { useState, useEffect, useMemo } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
+import { motion } from 'framer-motion';
+import { getCareers, getRoadmapBySlug } from '@/lib/roadmaps';
+import { useProgress } from '@/hooks/useProgress';
+import { CompletionRing } from '@/components/progress/CompletionRing';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
+import { Info } from 'lucide-react';
+
+// Fuzzy match function for step names
+function normalizeStepName(name: string): string[] {
+  return name
+    .toLowerCase()
+    .replace(/[^\w\s]/g, ' ') // Remove punctuation
+    .split(/\s+/)
+    .filter(Boolean); // Remove empty strings
+}
+
+function calculateSimilarity(nameA: string, nameB: string): number {
+  const tokensA = normalizeStepName(nameA);
+  const tokensB = normalizeStepName(nameB);
+  
+  if (tokensA.length === 0 || tokensB.length === 0) return 0;
+  
+  // Calculate Jaccard similarity (intersection / union)
+  const setA = new Set(tokensA);
+  const setB = new Set(tokensB);
+  
+  const intersection = new Set([...setA].filter(x => setB.has(x)));
+  const union = new Set([...setA, ...setB]);
+  
+  return intersection.size / union.size;
+}
+
+function findCommonSteps(stepsA: Array<{ name: string }>, stepsB: Array<{ name: string }>): Map<string, string[]> {
+  const commonMap = new Map<string, string[]>();
+  const threshold = 0.3; // 30% similarity threshold
+  
+  stepsA.forEach((stepA) => {
+    stepsB.forEach((stepB) => {
+      const similarity = calculateSimilarity(stepA.name, stepB.name);
+      if (similarity >= threshold) {
+        if (!commonMap.has(stepA.name)) {
+          commonMap.set(stepA.name, []);
+        }
+        commonMap.get(stepA.name)!.push(stepB.name);
+      }
+    });
+  });
+  
+  return commonMap;
+}
+
+interface StepItemProps {
+  step: { name: string; desc: string; resources: string[] };
+  index: number;
+ slug: string;
+  isCommon: boolean;
+}
+
+function StepItem({ step, index, slug, isCommon }: StepItemProps) {
+  const progress = useProgress(slug);
+  const stepId = `step-${index}`;
+  const isDone = progress.completed[stepId] || false;
+
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+          <motion.div
+            className={`
+              flex items-center gap-3 p-3 rounded-lg border transition-all
+              ${isDone 
+                ? 'bg-green-50 dark:bg-green-900/20 border-green-300 dark:border-green-700' 
+                : 'bg-gray-50 dark:bg-gray-800/50 border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600'
+              }
+            `}
+            whileHover={{ scale: 1.02 }}
+            transition={{ duration: 0.2 }}
+          >
+            {/* Step number circle */}
+            <div className={`
+              flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center text-white text-xs font-bold
+              ${isDone 
+                ? 'bg-gradient-to-r from-green-600 to-green-700' 
+                : 'bg-gradient-to-r from-blue-500 to-purple-500'
+              }
+            `}>
+              {index + 1}
+            </div>
+            
+            {/* Step name */}
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-2">
+                <h4 className={`text-sm font-medium truncate ${
+                  isDone 
+                    ? 'text-green-900 dark:text-green-100 line-through' 
+                    : 'text-gray-900 dark:text-white'
+                }`}>
+                  {step.name}
+                </h4>
+                {isCommon && (
+                  <Badge variant="secondary" className="text-xs px-1.5 py-0">
+                    Common
+                  </Badge>
+                )}
+              </div>
+            </div>
+            
+            {/* Completion indicator */}
+            {isDone && (
+              <motion.div
+                initial={{ scale: 0 }}
+                animate={{ scale: 1 }}
+                className="flex-shrink-0"
+              >
+                <div className="w-4 h-4 rounded-full bg-green-500 flex items-center justify-center">
+                  <svg className="w-2.5 h-2.5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                  </svg>
+                </div>
+              </motion.div>
+            )}
+          </motion.div>
+        </TooltipTrigger>
+        <TooltipContent side="right" className="max-w-xs">
+          <div className="space-y-2">
+            <p className="font-semibold text-sm">{step.name}</p>
+            <p className="text-xs text-muted-foreground">{step.desc}</p>
+            {step.resources.length > 0 && (
+              <div className="mt-2 pt-2 border-t">
+                <p className="text-xs font-medium mb-1">Resources:</p>
+                <ul className="text-xs space-y-1">
+                  {step.resources.slice(0, 3).map((resource, idx) => (
+                    <li key={idx} className="text-muted-foreground">• {resource}</li>
+                  ))}
+                  {step.resources.length > 3 && (
+                    <li className="text-muted-foreground">+{step.resources.length - 3} more</li>
+                  )}
+                </ul>
+              </div>
+            )}
+          </div>
+        </TooltipContent>
+      </Tooltip>
+  );
+}
 
 export default function ComparePage() {
-  const careers = getCareers()
-  const [career1, setCareer1] = useState<string>('')
-  const [career2, setCareer2] = useState<string>('')
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const careers = getCareers();
 
-  const selectedCareer1 = careers.find(c => c.slug === career1)
-  const selectedCareer2 = careers.find(c => c.slug === career2)
+  const [careerA, setCareerA] = useState<string>('');
+  const [careerB, setCareerB] = useState<string>('');
 
-  const showComparison = selectedCareer1 && selectedCareer2
+  // Initialize from URL or preselect first two
+  useEffect(() => {
+    const a = searchParams.get('a');
+    const b = searchParams.get('b');
+    
+    if (a && b && careers.some(c => c.slug === a) && careers.some(c => c.slug === b)) {
+      setCareerA(a);
+      setCareerB(b);
+    } else if (careers.length >= 2) {
+      // Preselect first two
+      const first = careers[0].slug;
+      const second = careers[1].slug;
+      setCareerA(first);
+      setCareerB(second);
+      router.replace(`/compare?a=${first}&b=${second}`, { scroll: false });
+    }
+  }, [searchParams, careers, router]);
+
+  // Update URL when selections change
+  useEffect(() => {
+    if (careerA && careerB && careerA !== careerB) {
+      router.replace(`/compare?a=${careerA}&b=${careerB}`, { scroll: false });
+    }
+  }, [careerA, careerB, router]);
+
+  const roadmapA = careerA ? getRoadmapBySlug(careerA) : null;
+  const roadmapB = careerB ? getRoadmapBySlug(careerB) : null;
+
+  const progressA = useProgress(careerA);
+  const progressB = useProgress(careerB);
+
+  // Find common steps
+  const commonSteps = useMemo(() => {
+    if (!roadmapA || !roadmapB) return new Map<string, string[]>();
+    return findCommonSteps(roadmapA.steps, roadmapB.steps);
+  }, [roadmapA, roadmapB]);
+
+  const commonCount = commonSteps.size;
+
+  if (!roadmapA || !roadmapB) {
+    return (
+      <div className="container mx-auto px-4 py-12">
+        <div className="text-center">
+          <p className="text-muted-foreground">Select two careers to compare</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 dark:from-gray-900 dark:via-gray-800 dark:to-purple-900">
-      <div className="container mx-auto px-4 py-20 sm:px-6 lg:px-8">
+      <div className="container mx-auto px-4 py-12 sm:px-6 lg:px-8">
+        {/* Header */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.8 }}
-          className="text-center mb-16"
+          transition={{ duration: 0.6 }}
+          className="mb-8"
         >
-          <h1 className="text-4xl font-bold tracking-tight text-gray-900 dark:text-white sm:text-5xl">
+          <h1 className="text-4xl font-bold tracking-tight text-gray-900 dark:text-white sm:text-5xl mb-4">
             Compare Career Paths
           </h1>
-          <p className="mt-6 text-lg leading-8 text-gray-600 dark:text-gray-300 sm:text-xl max-w-3xl mx-auto">
-            Select two career paths to compare their learning steps, resources, and requirements side-by-side
+          <p className="text-lg text-gray-600 dark:text-gray-300 mb-6">
+            Side-by-side comparison of different tech career roadmaps
           </p>
-        </motion.div>
 
-        {/* Career Selection */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.8, delay: 0.2 }}
-          className="mb-12"
-        >
-          <Card className="bg-white/70 dark:bg-gray-900/70 backdrop-blur-sm border-0">
-            <CardHeader>
-              <CardTitle>Select Careers to Compare</CardTitle>
-              <CardDescription>
-                Choose two different career paths to see a detailed comparison
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div className="space-y-2">
-                  <label className="text-sm font-medium text-gray-900 dark:text-white">
-                    First Career
-                  </label>
-                  <Select value={career1} onValueChange={setCareer1}>
-                    <SelectTrigger className="w-full">
-                      <SelectValue placeholder="Select first career..." />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {careers.map((career) => (
-                        <SelectItem 
-                          key={career.slug} 
-                          value={career.slug}
-                          disabled={career.slug === career2}
-                        >
-                          {career.career}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div className="space-y-2">
-                  <label className="text-sm font-medium text-gray-900 dark:text-white">
-                    Second Career
-                  </label>
-                  <Select value={career2} onValueChange={setCareer2}>
-                    <SelectTrigger className="w-full">
-                      <SelectValue placeholder="Select second career..." />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {careers.map((career) => (
-                        <SelectItem 
-                          key={career.slug} 
-                          value={career.slug}
-                          disabled={career.slug === career1}
-                        >
-                          {career.career}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-
-              {career1 && career2 && (
-                <div className="mt-4 flex items-center justify-center">
-                  <Button
-                    variant="ghost"
-                    onClick={() => {
-                      setCareer1('')
-                      setCareer2('')
-                    }}
-                  >
-                    <X className="mr-2 h-4 w-4" />
-                    Clear Selection
-                  </Button>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        </motion.div>
-
-        {/* Comparison Results */}
-        {showComparison && selectedCareer1 && selectedCareer2 && (
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.8 }}
-            className="space-y-8"
-          >
-            {/* Overview Comparison */}
-            <Card className="bg-white/70 dark:bg-gray-900/70 backdrop-blur-sm border-0">
-              <CardHeader>
-                <CardTitle>Overview Comparison</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div className="space-y-4">
-                    <div>
-                      <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-2">
-                        {selectedCareer1.career}
-                      </h3>
-                      <p className="text-gray-600 dark:text-gray-300 text-sm mb-4">
-                        {selectedCareer1.tagline}
-                      </p>
-                      <div className="flex flex-wrap gap-2">
-                        <Badge variant="outline">
-                          {selectedCareer1.steps.length} steps
-                        </Badge>
-                        <Badge variant="secondary">
-                          {selectedCareer1.steps.reduce((acc, s) => acc + s.resources.length, 0)} resources
-                        </Badge>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="space-y-4">
-                    <div>
-                      <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-2">
-                        {selectedCareer2.career}
-                      </h3>
-                      <p className="text-gray-600 dark:text-gray-300 text-sm mb-4">
-                        {selectedCareer2.tagline}
-                      </p>
-                      <div className="flex flex-wrap gap-2">
-                        <Badge variant="outline">
-                          {selectedCareer2.steps.length} steps
-                        </Badge>
-                        <Badge variant="secondary">
-                          {selectedCareer2.steps.reduce((acc, s) => acc + s.resources.length, 0)} resources
-                        </Badge>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Side-by-Side Steps Comparison */}
-            <Card className="bg-white/70 dark:bg-gray-900/70 backdrop-blur-sm border-0">
-              <CardHeader>
-                <CardTitle>Learning Steps Comparison</CardTitle>
-                <CardDescription>
-                  Compare the learning path step-by-step
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  {/* Career 1 Steps */}
-                  <div className="space-y-4">
-                    <h4 className="font-semibold text-gray-900 dark:text-white sticky top-0 bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm py-2 -mx-4 px-4">
-                      {selectedCareer1.career} Steps
-                    </h4>
-                    {selectedCareer1.steps.map((step, index) => (
-                      <motion.div
-                        key={index}
-                        initial={{ opacity: 0, x: -20 }}
-                        animate={{ opacity: 1, x: 0 }}
-                        transition={{ delay: index * 0.1 }}
-                        className="p-4 rounded-lg bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800"
-                      >
-                        <div className="flex items-start gap-3">
-                          <div className="flex-shrink-0 w-6 h-6 rounded-full bg-blue-600 flex items-center justify-center text-white font-bold text-xs">
-                            {index + 1}
-                          </div>
-                          <div className="flex-1">
-                            <h5 className="font-semibold text-gray-900 dark:text-white mb-1">
-                              {step.name}
-                            </h5>
-                            <p className="text-xs text-gray-600 dark:text-gray-300 mb-2">
-                              {step.desc}
-                            </p>
-                            <div className="flex flex-wrap gap-1">
-                              {step.resources.slice(0, 2).map((resource, idx) => (
-                                <Badge key={idx} variant="secondary" className="text-xs">
-                                  {resource}
-                                </Badge>
-                              ))}
-                              {step.resources.length > 2 && (
-                                <Badge variant="outline" className="text-xs">
-                                  +{step.resources.length - 2}
-                                </Badge>
-                              )}
-                            </div>
-                          </div>
-                        </div>
-                      </motion.div>
-                    ))}
-                  </div>
-
-                  {/* Career 2 Steps */}
-                  <div className="space-y-4">
-                    <h4 className="font-semibold text-gray-900 dark:text-white sticky top-0 bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm py-2 -mx-4 px-4">
-                      {selectedCareer2.career} Steps
-                    </h4>
-                    {selectedCareer2.steps.map((step, index) => (
-                      <motion.div
-                        key={index}
-                        initial={{ opacity: 0, x: 20 }}
-                        animate={{ opacity: 1, x: 0 }}
-                        transition={{ delay: index * 0.1 }}
-                        className="p-4 rounded-lg bg-purple-50 dark:bg-purple-900/20 border border-purple-200 dark:border-purple-800"
-                      >
-                        <div className="flex items-start gap-3">
-                          <div className="flex-shrink-0 w-6 h-6 rounded-full bg-purple-600 flex items-center justify-center text-white font-bold text-xs">
-                            {index + 1}
-                          </div>
-                          <div className="flex-1">
-                            <h5 className="font-semibold text-gray-900 dark:text-white mb-1">
-                              {step.name}
-                            </h5>
-                            <p className="text-xs text-gray-600 dark:text-gray-300 mb-2">
-                              {step.desc}
-                            </p>
-                            <div className="flex flex-wrap gap-1">
-                              {step.resources.slice(0, 2).map((resource, idx) => (
-                                <Badge key={idx} variant="secondary" className="text-xs">
-                                  {resource}
-                                </Badge>
-                              ))}
-                              {step.resources.length > 2 && (
-                                <Badge variant="outline" className="text-xs">
-                                  +{step.resources.length - 2}
-                                </Badge>
-                              )}
-                            </div>
-                          </div>
-                        </div>
-                      </motion.div>
-                    ))}
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Action Buttons */}
-            <div className="flex flex-col sm:flex-row gap-4 justify-center">
-              <Button asChild size="lg" className="group">
-                <Link href={`/roadmaps/${selectedCareer1.slug}`}>
-                  View {selectedCareer1.career} Roadmap
-                  <ArrowRight className="ml-2 h-4 w-4 transition-transform group-hover:translate-x-1" />
-                </Link>
-              </Button>
-              <Button asChild size="lg" variant="outline" className="group">
-                <Link href={`/roadmaps/${selectedCareer2.slug}`}>
-                  View {selectedCareer2.career} Roadmap
-                  <ArrowRight className="ml-2 h-4 w-4 transition-transform group-hover:translate-x-1" />
-                </Link>
-              </Button>
+          {/* Career Selectors */}
+          <div className="flex flex-col sm:flex-row gap-4 mb-6">
+            <div className="flex-1">
+              <label className="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-300">
+                Career A
+              </label>
+              <Select value={careerA} onValueChange={setCareerA}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select career" />
+                </SelectTrigger>
+                <SelectContent>
+                  {careers.map((career) => (
+                    <SelectItem key={career.slug} value={career.slug}>
+                      {career.career}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
-          </motion.div>
-        )}
 
-        {/* No Selection State */}
-        {!showComparison && (
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.8, delay: 0.4 }}
-            className="text-center py-12"
-          >
-            <div className="bg-white/50 dark:bg-gray-900/50 backdrop-blur-sm rounded-2xl p-8 border border-gray-200 dark:border-gray-700">
-              <CheckCircle className="h-12 w-12 mx-auto mb-4 text-gray-400" />
-              <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">
-                Select two careers to compare
-              </h3>
-              <p className="text-gray-600 dark:text-gray-300">
-                Choose careers from the dropdowns above to see a detailed side-by-side comparison
+            <div className="flex-1">
+              <label className="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-300">
+                Career B
+              </label>
+              <Select value={careerB} onValueChange={setCareerB}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select career" />
+                </SelectTrigger>
+                <SelectContent>
+                  {careers.map((career) => (
+                    <SelectItem key={career.slug} value={career.slug}>
+                      {career.career}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
+          {/* Info Panel */}
+          {commonCount > 0 && (
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              className="flex items-center gap-2 p-3 rounded-lg bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800"
+            >
+              <Info className="h-5 w-5 text-blue-600 dark:text-blue-400 flex-shrink-0" />
+              <p className="text-sm text-blue-900 dark:text-blue-100">
+                These careers share <span className="font-semibold">{commonCount}</span> foundational skill{commonCount !== 1 ? 's' : ''}.
               </p>
-            </div>
+            </motion.div>
+          )}
+        </motion.div>
+
+        {/* Comparison Grid */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {/* Column A */}
+          <motion.div
+            initial={{ opacity: 0, x: -20 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ duration: 0.6, delay: 0.2 }}
+            className="sticky top-4 self-start"
+          >
+            <Card className="bg-white/70 dark:bg-gray-900/70 backdrop-blur-sm border-0 shadow-lg">
+              <CardHeader className="sticky top-0 bg-white/95 dark:bg-gray-900/95 backdrop-blur-sm z-10 border-b">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-full bg-gradient-to-r from-blue-600 to-purple-600 flex items-center justify-center text-white font-bold">
+                      A
+                    </div>
+                    <div>
+                      <CardTitle className="text-xl">{roadmapA.career}</CardTitle>
+                      <p className="text-sm text-muted-foreground mt-1">{roadmapA.tagline}</p>
+                    </div>
+                  </div>
+                  <CompletionRing 
+                    value={progressA.percent(roadmapA.steps.length)} 
+                    size={48}
+                  />
+                </div>
+              </CardHeader>
+              <CardContent className="pt-6">
+                <div className="space-y-2">
+                  {roadmapA.steps.map((step, index) => (
+                    <StepItem
+                      key={index}
+                      step={step}
+                      index={index}
+                      slug={careerA}
+                      isCommon={commonSteps.has(step.name)}
+                    />
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
           </motion.div>
-        )}
+
+          {/* Column B */}
+          <motion.div
+            initial={{ opacity: 0, x: 20 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ duration: 0.6, delay: 0.3 }}
+            className="sticky top-4 self-start"
+          >
+            <Card className="bg-white/70 dark:bg-gray-900/70 backdrop-blur-sm border-0 shadow-lg">
+              <CardHeader className="sticky top-0 bg-white/95 dark:bg-gray-900/95 backdrop-blur-sm z-10 border-b">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-full bg-gradient-to-r from-orange-600 to-red-600 flex items-center justify-center text-white font-bold">
+                      B
+                    </div>
+                    <div>
+                      <CardTitle className="text-xl">{roadmapB.career}</CardTitle>
+                      <p className="text-sm text-muted-foreground mt-1">{roadmapB.tagline}</p>
+                    </div>
+                  </div>
+                  <CompletionRing 
+                    value={progressB.percent(roadmapB.steps.length)} 
+                    size={48}
+                  />
+                </div>
+              </CardHeader>
+              <CardContent className="pt-6">
+                <div className="space-y-2">
+                  {roadmapB.steps.map((step, index) => {
+                    // Check if this step matches any common step from A
+                    const isCommon = Array.from(commonSteps.values())
+                      .some(matches => matches.includes(step.name));
+                    
+                    return (
+                      <StepItem
+                        key={index}
+                        step={step}
+                        index={index}
+                        slug={careerB}
+                        isCommon={isCommon}
+                      />
+                    );
+                  })}
+                </div>
+              </CardContent>
+            </Card>
+          </motion.div>
+        </div>
       </div>
     </div>
-  )
+  );
 }
