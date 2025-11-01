@@ -153,7 +153,7 @@ export function RoadmapGraph({
       transition: prefersReducedMotion
         ? { duration: 0 }
         : {
-            type: 'spring',
+            type: 'spring' as const,
             stiffness: 200,
             damping: 20,
             delay: index * 0.1,
@@ -164,43 +164,51 @@ export function RoadmapGraph({
       transition: prefersReducedMotion
         ? { duration: 0 }
         : {
-            type: 'spring',
+            type: 'spring' as const,
             stiffness: 400,
             damping: 15,
           },
     },
   };
 
-  const glowVariants = {
-    inactive: {
-      boxShadow: prefersReducedMotion 
-        ? '0 0 0px rgba(59, 130, 246, 0)'
-        : [
+  // Create glow variants based on motion preference
+  const glowVariants = prefersReducedMotion
+    ? {
+        inactive: {
+          boxShadow: '0 0 0px rgba(59, 130, 246, 0)',
+        },
+        active: {
+          boxShadow: '0 0 15px rgba(59, 130, 246, 0.4)',
+          transition: { duration: 0 },
+        },
+        completed: {
+          boxShadow: '0 0 15px rgba(34, 197, 94, 0.4)',
+        },
+      }
+    : {
+        inactive: {
+          boxShadow: [
             '0 0 0px rgba(59, 130, 246, 0)',
             '0 0 20px rgba(59, 130, 246, 0.3)',
             '0 0 0px rgba(59, 130, 246, 0)',
           ],
-    },
-    active: {
-      boxShadow: prefersReducedMotion
-        ? '0 0 15px rgba(59, 130, 246, 0.4)'
-        : [
+        },
+        active: {
+          boxShadow: [
             '0 0 0px rgba(59, 130, 246, 0)',
             '0 0 25px rgba(59, 130, 246, 0.6)',
             '0 0 0px rgba(59, 130, 246, 0)',
           ],
-      transition: prefersReducedMotion
-        ? { duration: 0 }
-        : {
+          transition: {
             duration: 2,
             repeat: Infinity,
-            ease: 'easeInOut',
+            ease: 'easeInOut' as const,
           },
-    },
-    completed: {
-      boxShadow: '0 0 15px rgba(34, 197, 94, 0.4)',
-    },
-  };
+        },
+        completed: {
+          boxShadow: '0 0 15px rgba(34, 197, 94, 0.4)',
+        },
+      };
 
   const lineVariants = {
     hidden: {
@@ -214,7 +222,7 @@ export function RoadmapGraph({
         ? { duration: 0 }
         : {
             duration: 0.8,
-            ease: 'easeInOut',
+            ease: 'easeInOut' as const,
           },
     },
   };
@@ -232,7 +240,7 @@ export function RoadmapGraph({
       transition: prefersReducedMotion
         ? { duration: 0 }
         : {
-            type: 'spring',
+            type: 'spring' as const,
             stiffness: 300,
             damping: 30,
           },
@@ -376,7 +384,7 @@ export function RoadmapGraph({
                     className="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-green-500 flex items-center justify-center shadow-md"
                     initial={{ scale: 0 }}
                     animate={{ scale: 1 }}
-                    transition={{ type: 'spring', stiffness: 400, damping: 15 }}
+                    transition={{ type: 'spring' as const, stiffness: 400, damping: 15 }}
                   >
                     <Check className="w-3 h-3 text-white" />
                   </motion.div>
@@ -414,7 +422,7 @@ export function RoadmapGraph({
                   height: isSelected ? 'auto' : 0,
                 }}
                 transition={prefersReducedMotion ? { duration: 0 } : {
-                  type: 'spring',
+                  type: 'spring' as const,
                   stiffness: 300,
                   damping: 30,
                 }}

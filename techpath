@@ -1,0 +1,5 @@
+[33maf90277[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32mmain[m[33m, [m[1;31morigin/main[m[33m, [m[1;31morigin/HEAD[m[33m)[m Update layout.tsx and clean up temporary files
+[33mde82ac1[m Update: Remove temporary UPDATE_GITHUB.md file
+[33me980009[m Add GitHub update guide
+[33m6725c46[m Fix vercel.json: remove incorrect functions runtime configuration
+[33m16f670c[m Initial commit: TechPath with testing and deployment setup
