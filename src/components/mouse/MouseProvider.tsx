@@ -33,21 +33,25 @@ export function MouseProvider({ children }: MouseProviderProps) {
     // Check if mobile (coarse pointer)
     const isMobile = window.matchMedia('(pointer: coarse)').matches;
 
-    // Check localStorage
-    const stored = localStorage.getItem('techpath-effects');
-    let shouldEnable = false;
+    // Default: enabled by default (unless mobile or reduced motion)
+    let shouldEnable = !prefersReducedMotion && !isMobile;
 
+    // Check localStorage for user preference override
+    const stored = localStorage.getItem('techpath-effects');
     if (stored !== null) {
       try {
         const parsed = JSON.parse(stored);
-        shouldEnable = parsed.enabled === true && !prefersReducedMotion && !isMobile;
+        // If user has explicitly set a preference, respect it
+        if (parsed.enabled !== undefined) {
+          shouldEnable = parsed.enabled === true && !prefersReducedMotion && !isMobile;
+        }
       } catch {
-        // Invalid JSON, ignore
+        // Invalid JSON, ignore and use default (enabled)
       }
     }
 
-    // Only enable if not reduced motion and not mobile
-    if (shouldEnable && !prefersReducedMotion && !isMobile) {
+    // Set enabled state
+    if (shouldEnable) {
       setEnabledState(true);
     }
   }, []);
