@@ -150,7 +150,10 @@ export default function RoadmapPageClient({ roadmap }: RoadmapPageClientProps) {
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="p-0">
-                  <RoadmapGraph steps={roadmap.steps} />
+                  <RoadmapGraph 
+                    steps={roadmap.steps}
+                    careerSlug={roadmap.slug}
+                  />
                 </CardContent>
               </Card>
             </motion.div>
