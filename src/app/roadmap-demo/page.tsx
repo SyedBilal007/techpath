@@ -129,7 +129,10 @@ export default function RoadmapDemoPage() {
             </CardHeader>
             <CardContent className="p-0">
               <div className="bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-800 dark:to-gray-900 p-8">
-                <RoadmapGraph steps={selectedCareer.steps} />
+                <RoadmapGraph 
+                  steps={selectedCareer.steps}
+                  careerSlug={selectedCareer.slug}
+                />
               </div>
             </CardContent>
           </Card>
